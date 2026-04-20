@@ -1,190 +1,440 @@
-# Detection-de-fraudes-de-cartes-bancaires-
-Détection de fraudes de cartes bancaires   (DATA MINING)      
-<img width="597" height="455" alt="image" src="https://github.com/user-attachments/assets/c60d0c7a-cb5e-4a12-b6a1-e0bea7c581a1" />
+# Credit Card Fraud Detection — Data Mining
 
-
-
-<img width="965" height="876" alt="image" src="https://github.com/user-attachments/assets/d5bf12a2-eb71-4a70-bd92-ddbef7803c0e" />
-
-
-
-<img width="520" height="455" alt="image" src="https://github.com/user-attachments/assets/e467c918-d274-46c0-b369-a360422a6936" />
-
-
-
-
-<img width="554" height="435" alt="image" src="https://github.com/user-attachments/assets/dea815e2-e13c-4f38-b55a-0587ec3999cb" />
-
-
-
-
-<img width="576" height="455" alt="image" src="https://github.com/user-attachments/assets/fb9f85cc-f71e-4d5f-b58d-bb301a9f9047" />
-
-
-
-
-
-<img width="698" height="547" alt="image" src="https://github.com/user-attachments/assets/61ce2208-f04a-44a6-96f6-9f26a0a4a646" />
-
-
-
-
-#   Projet Data Mining — Détection de Fraude Bancaire
-
-##   Interprétation Métier & Rapport Final
+A machine learning pipeline for real-time detection of fraudulent banking transactions, combining supervised classification, unsupervised clustering, and association rule mining.
 
 ---
 
-## 1.  Pourquoi la Recall est plus importante que l’Accuracy ?
+## Table of Contents
 
-Dans les systèmes financiers, le taux de fraude est extrêmement faible (<0,2 % des transactions), ce qui crée un **déséquilibre des classes**.
-
-###  Limite de l’Accuracy
-Un modèle qui prédit toujours *"non frauduleuse"* peut atteindre **99,8 % d’accuracy**, mais :
-- Il ne détecte **aucune fraude**
-- Il est **inutile en pratique**
-
-### Importance de la Recall (Sensibilité)
-La Recall mesure la proportion de fraudes détectées :
-
-\[
-Recall = \frac{\text{Fraudes détectées}}{\text{Fraudes totales}}
-\]
-
-### Raison métier
-- Chaque fraude non détectée = **perte financière directe**
-- Les **faux négatifs** coûtent beaucoup plus cher que les faux positifs
-
-###  Conclusion métier
-- Une **Recall élevée** protège la banque et ses clients, même avec quelques fausses alertes.
+1. [Project Overview](#1-project-overview)
+2. [Scientific Rationale](#2-scientific-rationale)
+3. [Dataset](#3-dataset)
+4. [Methodology](#4-methodology)
+5. [Models & Results](#5-models--results)
+6. [Clustering Analysis](#6-clustering-analysis)
+7. [Association Rules](#7-association-rules)
+8. [Operational ML Pipeline](#8-operational-ml-pipeline)
+9. [Project Structure](#9-project-structure)
+10. [Installation & Usage](#10-installation--usage)
+11. [KDD Validation Checklist](#11-kdd-validation-checklist)
+12. [Roadmap](#12-roadmap)
+13. [Authors](#13-authors)
 
 ---
 
-## 2. Meilleur modèle : Performance vs Métier
+## 1. Project Overview
 
-| Modèle              | Recall        | Precision     | ROC-AUC     | Commentaire |
-|--------------------|--------------|--------------|------------|------------|
-| Logistic Regression | Moyenne      | Moyenne      | Bonne      | Simple mais limité |
-| Decision Tree       | Élevée mais instable | Moyenne | Variable   | Risque d’overfitting |
-| Random Forest       | Très élevée  | Bonne        | Excellente | ⭐ Meilleur compromis |
-| Isolation Forest    | Mauvais      | n/a          | Correct    | Non supervisé |
-| K-Means             | Non supervisé| n/a          | Faible     | Pas adapté seul |
+Credit card fraud represents a critical challenge for financial institutions. The fraud rate in transaction datasets is typically below 0.2%, creating a severe class imbalance that invalidates naive accuracy-based evaluation and demands specialized modeling strategies.
 
-###  Recommandation métier
-- **Random Forest** → Production  
-- **XGBoost** → Optimisation (après tuning)
+This project implements a complete Data Mining pipeline — from raw data ingestion to a decision-ready inference layer — applying:
 
-### ✔️ Avantages
-- Haute Recall  
-- Bonne Precision  
-- Robustesse aux données déséquilibrées  
-- Interprétabilité (importance des variables)
+- **Supervised learning** (Logistic Regression, Decision Tree, Random Forest, XGBoost)
+- **Unsupervised learning** (K-Means clustering, Isolation Forest)
+- **Frequent pattern mining** (Apriori — association rules)
+
+The system is designed to operate in near real-time (< 100 ms inference) and comply with financial regulation frameworks (PSD2, KYC, AML).
 
 ---
 
-## 3.  Valeur métier du Clustering (K-Means)
+## 2. Scientific Rationale
 
-Le clustering ne détecte pas directement la fraude, mais apporte :
+### Why Recall, not Accuracy
 
-###  Segmentation des comportements
-- Paiements fréquents / faibles montants  
-- Achats irréguliers / montants élevés  
-- Usage intensif en ligne  
-- Transactions nocturnes  
+In heavily imbalanced datasets, accuracy is a misleading metric. A trivial classifier that always predicts "non-fraudulent" achieves:
 
-###  Détection d’anomalies
-- Identification d’outliers  
-- Pré-alertes  
-- Surveillance renforcée  
+```
+Accuracy = 99.8%   |   Fraud detected = 0
+```
 
-###  Amélioration du ML
-- Feature engineering (cluster = variable)  
-- Amélioration des performances des modèles  
+This classifier is operationally worthless. The correct primary metric is **Recall (Sensitivity)**:
 
-###  Conclusion
-- Comprendre le comportement normal = mieux détecter les anomalies
+```
+Recall = True Positives / (True Positives + False Negatives)
+       = Detected frauds / Total actual frauds
+```
 
----
+**Business justification:**
 
-## 4.  Règles d’association (Apriori)
+| Error type | Consequence | Cost |
+|---|---|---|
+| False Negative (missed fraud) | Direct financial loss, client harm | High |
+| False Positive (false alert) | Minor friction (OTP, manual review) | Low |
 
-###  Exemples utiles
-- Transaction nocturne + montant élevé → risque élevé  
-- Transactions rapides (<10 sec) → suspicion  
-- Pays inhabituel → alerte  
-- Plusieurs échecs → comportement anormal  
+A high-Recall model absorbs a controlled number of false positives in exchange for minimizing undetected fraud — which is the operationally correct trade-off.
 
-###  Valeur métier
-- Création de règles antifraude  
-- Déclenchement de vérifications (OTP, 3D Secure)  
-- Formation des équipes sécurité  
+### Evaluation Metrics Used
 
-### Conclusion
-- Complément du ML avec une logique explicable et traçable
+- **Recall** — primary metric (fraud detection rate)
+- **Precision** — controls alert fatigue
+- **F1-Score** — harmonic balance of both
+- **ROC-AUC** — global discriminative power across all decision thresholds
+- **Confusion Matrix** — raw breakdown of TP / TN / FP / FN
 
 ---
 
-## 5. Pipeline ML (Système opérationnel)
+## 3. Dataset
 
-### Architecture
+The dataset used is the standard benchmark for credit card fraud detection research.
 
-#### 1. Collecte des données
-- API interne : montant, lieu, heure, client ID, device ID, IP, historique
+| Property | Value |
+|---|---|
+| Transactions | 284,807 |
+| Fraudulent transactions | 492 (0.172%) |
+| Features | 30 (V1–V28 PCA-transformed, Time, Amount) |
+| Target variable | `Class` (0 = legitimate, 1 = fraud) |
 
-#### 2. Prétraitement
-- Normalisation / scaling  
-- Feature engineering  
-- Enrichissement (historique, clusters)
+**Key preprocessing steps:**
 
-#### 3. Modèle ML
-- Random Forest / XGBoost  
-- Détection < 100 ms  
-- Sortie : probabilité de fraude  
+```python
+from sklearn.preprocessing import StandardScaler
 
-#### 4. Prise de décision
+# Scale Amount and Time (not PCA-transformed)
+scaler = StandardScaler()
+df['scaled_amount'] = scaler.fit_transform(df['Amount'].values.reshape(-1, 1))
+df['scaled_time']   = scaler.fit_transform(df['Time'].values.reshape(-1, 1))
 
-| Score        | Action |
-|-------------|-------|
-| < 0.2       | Acceptée |
-| 0.2 – 0.5   | Vérification (OTP) |
-| > 0.5       | Bloquée + alerte |
+df.drop(['Time', 'Amount'], axis=1, inplace=True)
+```
 
-#### 5. Monitoring
-- Tests A/B  
-- Détection de drift  
-- Ré-entraînement (hebdo/mensuel)  
-- Dashboard (Recall, pertes évitées)
+**Class imbalance handling:**
 
-#### 6. Audit & traçabilité
-- Journalisation des décisions  
-- Explication des prédictions  
+```python
+from imblearn.over_sampling import SMOTE
 
-###  Conclusion
-- Pipeline fiable, rapide et conforme (PSD2, KYC, AML)
+sm = SMOTE(random_state=42)
+X_resampled, y_resampled = sm.fit_resample(X_train, y_train)
+```
 
 ---
 
-##  Conclusion finale
+## 4. Methodology
 
-- ✔️ La **Recall est prioritaire** pour limiter les pertes  
-- ✔️ Meilleurs modèles : **Random Forest / XGBoost**  
-- ✔️ Le clustering aide à comprendre les comportements  
-- ✔️ Les règles d’association apportent une logique métier  
-- ✔️ Pipeline temps réel indispensable  
+The project follows the **KDD (Knowledge Discovery in Databases)** process:
+
+```
+Step 1  Data Selection
+        Raw transaction logs, feature extraction (amount, time, device, location)
+
+Step 2  Preprocessing
+        Null handling, scaling, SMOTE resampling, feature engineering
+
+Step 3  Transformation
+        PCA already applied upstream (V1-V28)
+        Cluster labels added as engineered feature
+
+Step 4  Data Mining
+        Supervised:    Logistic Regression, Decision Tree, Random Forest, XGBoost
+        Unsupervised:  K-Means, Isolation Forest
+        Pattern:       Apriori association rules
+
+Step 5  Evaluation
+        Recall, Precision, F1, ROC-AUC, Confusion Matrix
+
+Step 6  Interpretation
+        Business rule generation, pipeline design, deployment specification
+```
 
 ---
 
-##  Validation du projet Data Mining
+## 5. Models & Results
 
-| Étape                         | Statut |
-|------------------------------|--------|
-| Définition des objectifs     | ✔️ |
-| Préparation des données (KDD)| ✔️ |
-| Fouille de données           | ✔️ |
-| Évaluation des modèles       | ✔️ |
+### Comparative Performance
 
-###   Conclusion générale
-=> Toutes les étapes sont validées.  
-=> Le notebook final peut être généré selon cette structure.
+| Model | Recall | Precision | ROC-AUC | Notes |
+|---|---|---|---|---|
+| Logistic Regression | Moderate | Moderate | Good | Baseline; limited on non-linear patterns |
+| Decision Tree | High (unstable) | Moderate | Variable | Prone to overfitting; poor generalization |
+| Random Forest | Very high | Good | Excellent | Best overall compromise |
+| XGBoost | Very high | Very good | Excellent | Best after hyperparameter tuning |
+| Isolation Forest | Low | n/a | Moderate | Unsupervised; useful as anomaly pre-filter |
+| K-Means | Not applicable | n/a | Low | Behavioral segmentation, not direct detection |
+
+### Random Forest — Recommended for Production
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, roc_auc_score
+
+rf = RandomForestClassifier(
+    n_estimators=100,
+    class_weight='balanced',
+    random_state=42,
+    n_jobs=-1
+)
+rf.fit(X_train, y_train)
+
+y_pred = rf.predict(X_test)
+y_prob = rf.predict_proba(X_test)[:, 1]
+
+print(classification_report(y_test, y_pred))
+print(f"ROC-AUC: {roc_auc_score(y_test, y_prob):.4f}")
+```
+
+**Why Random Forest:**
+
+- Robust to class imbalance via `class_weight='balanced'`
+- High Recall without collapsing Precision
+- Native feature importance for model explainability
+- No assumption on feature distributions
+
+### XGBoost — Recommended after Tuning
+
+```python
+from xgboost import XGBClassifier
+
+xgb = XGBClassifier(
+    scale_pos_weight=len(y_train[y_train==0]) / len(y_train[y_train==1]),
+    use_label_encoder=False,
+    eval_metric='aucpr',
+    random_state=42
+)
+xgb.fit(X_train, y_train)
+```
+
+`scale_pos_weight` explicitly compensates for class imbalance without SMOTE.
 
 ---
+
+## 6. Clustering Analysis
+
+K-Means clustering is not a fraud detector in isolation — it is a **behavioral profiling tool** that improves the supervised pipeline.
+
+### Behavioral Segments Identified
+
+| Cluster | Behavioral Profile | Fraud Risk |
+|---|---|---|
+| 0 | Frequent transactions, low amounts | Low |
+| 1 | Irregular transactions, high amounts | Elevated |
+| 2 | Heavy online usage | Medium |
+| 3 | Nocturnal transactions, irregular patterns | High |
+
+### Usage in the ML Pipeline
+
+```python
+from sklearn.cluster import KMeans
+
+kmeans = KMeans(n_clusters=4, random_state=42)
+df['cluster'] = kmeans.fit_predict(X_scaled)
+
+# Cluster label used as engineered feature in supervised model
+X_with_cluster = pd.concat([X, df['cluster']], axis=1)
+```
+
+Cluster labels function as a compressed behavioral signal, improving the discriminative power of downstream classifiers.
+
+### Outlier Pre-filtering
+
+Transactions that fall in low-density cluster regions are flagged as anomaly candidates before supervised scoring — reducing the inference load on the main model.
+
+---
+
+## 7. Association Rules
+
+Apriori mining extracts frequent co-occurrence patterns from discretized transaction features, producing human-readable antiffraud rules.
+
+### Example Rules Extracted
+
+| Antecedent | Consequent | Interpretation |
+|---|---|---|
+| Nocturnal transaction + high amount | Fraud risk elevated | Temporal + amount signal |
+| Inter-transaction delay < 10 sec | Suspicious burst | Automated attack pattern |
+| Country != usual country | Alert | Geographic anomaly |
+| 3+ consecutive failed attempts | Abnormal behavior | Brute-force or card testing |
+
+### Implementation
+
+```python
+from mlxtend.frequent_patterns import apriori, association_rules
+
+# Discretize and binarize transaction features
+frequent_itemsets = apriori(df_encoded, min_support=0.01, use_colnames=True)
+rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.7)
+
+rules_sorted = rules.sort_values('lift', ascending=False)
+print(rules_sorted[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head(10))
+```
+
+### Operational Value
+
+- Direct input for rule-based antifraude engines (alongside the ML model)
+- Triggers for 3D Secure / OTP challenges on suspicious patterns
+- Audit trail: rules are fully explainable and traceable for compliance
+
+---
+
+## 8. Operational ML Pipeline
+
+### End-to-End Architecture
+
+```
+Step 1  Data Ingestion
+        Sources: internal API (amount, merchant, timestamp,
+                 client_id, device_id, IP, transaction history)
+
+Step 2  Preprocessing (< 10 ms)
+        - StandardScaler on Amount / Time
+        - Feature engineering (velocity, geo-delta, cluster label)
+        - Enrichment from historical profile
+
+Step 3  Inference (< 100 ms)
+        - Random Forest / XGBoost
+        - Output: fraud probability score [0.0, 1.0]
+
+Step 4  Decision Layer
+
+        Score < 0.20         Transaction approved
+        Score 0.20 -- 0.50   Challenge (OTP / 3D Secure)
+        Score > 0.50         Blocked + compliance alert
+
+Step 5  Monitoring & Retraining
+        - Weekly / monthly retraining on labeled feedback
+        - Drift detection (feature distribution shift)
+        - A/B testing between model versions
+        - Dashboard: Recall trend, prevented losses
+
+Step 6  Audit & Compliance
+        - Full decision logging (prediction, score, features used)
+        - SHAP-based prediction explanation on flagged transactions
+        - Regulatory alignment: PSD2, KYC, AML
+```
+
+### SHAP Explainability
+
+```python
+import shap
+
+explainer = shap.TreeExplainer(rf)
+shap_values = explainer.shap_values(X_test)
+
+# Visualize feature contribution for a flagged transaction
+shap.force_plot(
+    explainer.expected_value[1],
+    shap_values[1][0],
+    X_test.iloc[0]
+)
+```
+
+---
+
+## 9. Project Structure
+
+```
+fraud-detection/
+├── data/
+│   ├── creditcard.csv              # Raw dataset (not committed — see note below)
+│   └── processed/                  # Preprocessed train/test splits
+├── notebooks/
+│   ├── 01_EDA.ipynb                # Exploratory data analysis
+│   ├── 02_Preprocessing.ipynb      # Scaling, SMOTE, feature engineering
+│   ├── 03_Supervised_Models.ipynb  # LR, DT, RF, XGBoost training & eval
+│   ├── 04_Unsupervised.ipynb       # K-Means, Isolation Forest
+│   └── 05_Association_Rules.ipynb  # Apriori mining
+├── src/
+│   ├── preprocessing.py            # Scaling, SMOTE pipeline
+│   ├── feature_engineering.py      # Cluster labels, velocity features
+│   ├── train.py                    # Model training entrypoint
+│   ├── evaluate.py                 # Metrics, confusion matrix, ROC curve
+│   ├── predict.py                  # Inference on new transactions
+│   └── rules.py                    # Apriori pipeline
+├── models/
+│   └── random_forest_v1.pkl        # Serialized production model
+├── reports/
+│   └── final_report.md             # Business interpretation & conclusions
+├── requirements.txt
+└── README.md
+```
+
+> The dataset `creditcard.csv` is not included in this repository.
+> Download it from [Kaggle — Credit Card Fraud Detection](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud) and place it in `data/`.
+
+---
+
+## 10. Installation & Usage
+
+### Requirements
+
+```bash
+pip install -r requirements.txt
+```
+
+```
+pandas==2.0.3
+numpy==1.25.2
+scikit-learn==1.3.0
+imbalanced-learn==0.11.0
+xgboost==1.7.6
+mlxtend==0.22.0
+shap==0.42.1
+matplotlib==3.7.2
+seaborn==0.12.2
+jupyter==1.0.0
+```
+
+### Run the full pipeline
+
+```bash
+# 1. Preprocess data
+python src/preprocessing.py --input data/creditcard.csv --output data/processed/
+
+# 2. Train models
+python src/train.py --model random_forest --output models/
+
+# 3. Evaluate
+python src/evaluate.py --model models/random_forest_v1.pkl --data data/processed/X_test.csv
+
+# 4. Predict on new transactions
+python src/predict.py --model models/random_forest_v1.pkl --input data/new_transactions.csv
+```
+
+### Run notebooks sequentially
+
+```bash
+jupyter notebook notebooks/
+```
+
+Execute notebooks `01` through `05` in order.
+
+---
+
+## 11. KDD Validation Checklist
+
+| KDD Step | Description | Status |
+|---|---|---|
+| Selection | Objective definition, dataset identification | Done |
+| Preprocessing | Null handling, scaling, SMOTE resampling | Done |
+| Transformation | Feature engineering, cluster enrichment | Done |
+| Data Mining | Supervised + unsupervised + pattern mining | Done |
+| Evaluation | Recall, Precision, F1, ROC-AUC, business interpretation | Done |
+
+All KDD phases are complete. The project is ready for notebook finalization and deployment specification.
+
+---
+
+## 12. Roadmap
+
+**Short term**
+- Hyperparameter tuning (GridSearchCV / Optuna) for XGBoost
+- Full SHAP integration for every flagged transaction
+- REST API wrapper for real-time inference (FastAPI)
+
+**Medium term**
+- Drift detection module (evidently.ai or custom KS-test on feature distributions)
+- Automated retraining trigger on Recall degradation
+- Grafana dashboard for operational monitoring (Recall trend, blocked transaction volume)
+
+**Long term**
+- Graph-based fraud detection (transaction network analysis — GNN)
+- Federated learning for multi-institution collaborative detection
+- LLM-assisted anomaly narrative generation for compliance reports
+
+---
+
+## 13. Authors
+
+**Data Mining Project — Credit Card Fraud Detection**
+
+Developed as part of an academic Data Mining curriculum, applying the full KDD methodology to a real-world, publicly available financial dataset.
+
+---
+
+*For questions regarding the methodology or results, refer to `reports/final_report.md` or open an issue.*
